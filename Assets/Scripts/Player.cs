@@ -120,13 +120,35 @@ public class Player : MonoBehaviour
     }
 
     //N: Calcular utilidad del tablero. Cuanto mayor el valor mejor el tablero.
-    //Utilidad = numero fichas propias - numero fichas rival
+    //Tiene en cuenta la diferencia de fichas, la movilidad y las esquinas. LAs esquinas tienen más peso porque son posiciones muy estacbles.
     private double CalculateUtility(Tile[] board)
     {
         int myPieces = boardManager.CountPieces(board, turn);
         int enemyPieces = boardManager.CountPieces(board, -turn);
-
-        return myPieces - enemyPieces;
+        
+        int myMoves = boardManager.FindSelectableTiles(board, turn).Count;
+        int enemyMoves = boardManager.FindSelectableTiles(board, -turn).Count;
+        
+        int[] corners = { 0, 7, 56, 63 };
+        
+        int cornerScore = 0;
+        
+        foreach (int corner in corners)
+        {
+            if (board[corner].value == turn)
+            {
+                cornerScore += 25;
+            }
+            else if (board[corner].value == -turn)
+            {
+                cornerScore -= 25;
+            }
+        }
+        
+        int pieceScore = myPieces - enemyPieces;
+        int mobilityScore = myMoves - enemyMoves;
+        
+        return pieceScore + (mobilityScore * 2) + cornerScore;
     }
 
     //N: Devuelve el hijo con mejor utilidad para un nodo MAX.
