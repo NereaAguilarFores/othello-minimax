@@ -28,6 +28,7 @@ public class Player : MonoBehaviour
 {
     public int turn;    
     private BoardManager boardManager;
+    private int maxDepth = 4;
 
     void Start()
     {
@@ -46,74 +47,42 @@ public class Player : MonoBehaviour
         root.type = Constants.MAX;
 
         //Generamos primer nivel de nodos hijos
+        //List<int> selectableTiles = boardManager.FindSelectableTiles(board, turn);
+
+        // N: Generamos los movimientos posibles de la IA desde el tablero actual.
         List<int> selectableTiles = boardManager.FindSelectableTiles(board, turn);
+
+        // Si no hay movimientos posibles, devolvemos -1.
+        if (selectableTiles.Count == 0)
+        {
+            return -1;
+        }
+
+        int bestMoveIndex = 0;
+        double bestUtility = double.NegativeInfinity;
 
         foreach (int s in selectableTiles)
         {
-            //Creo un nuevo nodo hijo con el tablero padre
-            Node n = new Node(root.board);
-            //Lo añadimos a la lista de nodos hijo
-            root.childList.Add(n);
-            //Enlazo con su padre
-            n.parent = root;
-            //En nivel 1, los hijos son MIN
-            n.type = Constants.MIN;
-            //Aplico un movimiento, generando un nuevo tablero con ese movimiento
-            boardManager.Move(n.board, s, turn);
-            //si queremos imprimir el nodo generado (tablero hijo)
-            //boardManager.PrintBoard(n.board);
+            Node child = new Node(root.board);
+            child.parent = root;
+            child.type = Constants.MIN;
+            root.childList.Add(child);
 
-            // N: Generamos los movimientos posibles del rival a partir de este tablero.
-            List<int> enemyMoves = boardManager.FindSelectableTiles(n.board, -turn);
-            
-            foreach (int enemyMove in enemyMoves)
+            boardManager.Move(child.board, s, turn);
+
+            // Después del movimiento de la IA, simulamos la respuesta del rival.
+            double utility = Minimax(child, maxDepth - 1, -turn, false);
+
+            if (utility > bestUtility)
             {
-                Node grandChild = new Node(n.board);
-                
-                n.childList.Add(grandChild);
-                
-                grandChild.parent = n;
-                grandChild.type = Constants.MAX;
-                
-                boardManager.Move(grandChild.board, enemyMove, -turn);
+                bestUtility = utility;
+                bestMoveIndex = selectableTiles.IndexOf(s);
             }
         }
 
-        //Selecciono un movimiento aleatorio. Esto habrá que modificarlo para elegir el mejor movimiento según MINIMAX
-        //int movimiento = Random.Range(0, selectableTiles.Count);
+        int movimiento = bestMoveIndex;
 
-
-        //N: Minimax a profundidad 2
-        //Primero evaluamos los nietos.
-        //Después, cada nodo MIN se queda con la menor utilidad de sus hijos.
-        foreach (Node child in root.childList)
-        {
-            if (child.childList.Count == 0)
-            {
-                // Si el rival no se puede mover, evaluamos directamente este tablero
-                child.utility = CalculateUtility(child.board);
-            }
-            else
-            {
-                double minUtility = child.childList[0].utility;
-                
-                for (int i = 0; i < child.childList.Count; i++)
-                {
-                    child.childList[i].utility = CalculateUtility(child.childList[i].board);
-                    
-                    if (i == 0 || child.childList[i].utility < minUtility)
-                    {
-                        minUtility = child.childList[i].utility;
-                    }
-                }
-                
-                child.utility = minUtility;
-            }
-        }
-        
-        // Elegimos el hijo con mayor utilidad, ya que la raíz es un nodo MAX.
-        
-        int movimiento = GetBestChildIndex(root);
+        Debug.Log("Movimiento elegido: " + selectableTiles[movimiento]);
 
         return selectableTiles[movimiento];
 
@@ -149,6 +118,71 @@ public class Player : MonoBehaviour
         int mobilityScore = myMoves - enemyMoves;
         
         return pieceScore + (mobilityScore * 2) + cornerScore;
+    }
+
+    // N: Implementa Minimax de forma recursiva. 
+    // depth indica cuántos niveles quedan por explorar
+    // currentTurn indica que jugador mueve en este nivel.
+    // isMax indica si el nodo intenta maximizar o minimizar la utilidad.
+    private double Minimax(Node node, int depth, int currentTurn, bool isMax)
+    {
+        List<int> moves = boardManager.FindSelectableTiles(node.board, currentTurn);
+
+        // Cuando llegamos a profundidad máxima o no hay movimientos posibles
+        if (depth == 0 || moves.Count == 0)
+        {
+            node.utility = CalculateUtility(node.board);
+            return node.utility;
+        }
+
+        if (isMax)
+        {
+            double bestUtility = double.NegativeInfinity;
+
+            foreach (int move in moves)
+            {
+                Node child = new Node(node.board);
+                child.parent = node;
+                child.type = Constants.MIN;
+                node.childList.Add(child);
+
+                boardManager.Move(child.board, move, currentTurn);
+
+                double utility = Minimax(child, depth - 1, -currentTurn, false);
+
+                if (utility > bestUtility)
+                {
+                    bestUtility = utility;
+                }
+            }
+
+            node.utility = bestUtility;
+            return bestUtility;
+        }
+        else
+        {
+            double bestUtility = double.PositiveInfinity;
+
+            foreach (int move in moves)
+            {
+                Node child = new Node(node.board);
+                child.parent = node;
+                child.type = Constants.MAX;
+                node.childList.Add(child);
+
+                boardManager.Move(child.board, move, currentTurn);
+
+                double utility = Minimax(child, depth - 1, -currentTurn, true);
+
+                if (utility < bestUtility)
+                {
+                    bestUtility = utility;
+                }
+            }
+
+            node.utility = bestUtility;
+            return bestUtility;
+        }
     }
 
     //N: Devuelve el hijo con mejor utilidad para un nodo MAX.
