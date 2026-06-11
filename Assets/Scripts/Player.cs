@@ -20,28 +20,29 @@ public class Node
             this.board[i].value = tiles[i].value;
         }
 
-    }    
+    }
 
 }
 
 public class Player : MonoBehaviour
 {
-    public int turn;    
+    public int turn;
     private BoardManager boardManager;
     private int maxDepth = 4;
+    public int heuristicType = 3; // 1 = H1, 2 = H2, 3 = H3
 
     void Start()
     {
         boardManager = GameObject.FindGameObjectWithTag("BoardManager").GetComponent<BoardManager>();
     }
-       
+
     /*
      * Entrada: Dado un tablero
      * Salida: Posición donde mueve  
      */
     public int SelectTile(Tile[] board)
-    {        
-        Debug.Log("ENTRA EN SELECT TILE - TURNO IA: " + turn);
+    {
+        //Debug.Log("ENTRA EN SELECT TILE - TURNO IA: " + turn);
         //Generamos el nodo raíz del árbol (MAX)
         Node root = new Node(board);
         root.type = Constants.MAX;
@@ -82,42 +83,89 @@ public class Player : MonoBehaviour
 
         int movimiento = bestMoveIndex;
 
-        Debug.Log("Movimiento elegido: " + selectableTiles[movimiento]);
+        //Debug.Log("Movimiento elegido: " + selectableTiles[movimiento]);
 
         return selectableTiles[movimiento];
 
     }
 
-    //N: Calcular utilidad del tablero. Cuanto mayor el valor mejor el tablero.
-    //Tiene en cuenta la diferencia de fichas, la movilidad y las esquinas. LAs esquinas tienen más peso porque son posiciones muy estacbles.
+    // N: Seleccionar heurística se usa para evalusr los nodos terminales
     private double CalculateUtility(Tile[] board)
+    {
+        if (heuristicType == 1)
+        {
+            return HeuristicH1(board);
+        }
+        else if (heuristicType == 2)
+        {
+            return HeuristicH2(board);
+        }
+        else
+        {
+            return HeuristicH3(board);
+        }
+    }
+
+    // H1: Heurística básica
+    // Evalúa únicamente la diferencia de fichas entre la IA y el rival.
+    private double HeuristicH1(Tile[] board)
     {
         int myPieces = boardManager.CountPieces(board, turn);
         int enemyPieces = boardManager.CountPieces(board, -turn);
-        
+
+        return myPieces - enemyPieces;
+    }
+
+    // H2: Heurística estratégica
+    // Evalúa cuántos movimientos tiene la IA frente al rival.
+    private double HeuristicH2(Tile[] board)
+    {
         int myMoves = boardManager.FindSelectableTiles(board, turn).Count;
         int enemyMoves = boardManager.FindSelectableTiles(board, -turn).Count;
-        
+
+        return myMoves - enemyMoves;
+    }
+
+    // H3: Heurística avanzada
+    // Prioriza esquinas y penaliza casillas peligrosas cercanas a esquinas vacías.
+    private double HeuristicH3(Tile[] board)
+    {
+        double score = 0;
+
         int[] corners = { 0, 7, 56, 63 };
-        
-        int cornerScore = 0;
-        
+
         foreach (int corner in corners)
         {
             if (board[corner].value == turn)
             {
-                cornerScore += 25;
+                score += 100;
             }
             else if (board[corner].value == -turn)
             {
-                cornerScore -= 25;
+                score -= 100;
             }
         }
-        
-        int pieceScore = myPieces - enemyPieces;
-        int mobilityScore = myMoves - enemyMoves;
-        
-        return pieceScore + (mobilityScore * 2) + cornerScore;
+
+        // Casillas peligrosas junto a esquinas.
+        // Si una esquina está vacía, ocupar estas casillas puede permitir al rival capturarla.
+        int[] dangerousTiles = { 1, 8, 9, 6, 14, 15, 48, 49, 57, 54, 55, 62 };
+
+        foreach (int tile in dangerousTiles)
+        {
+            if (board[tile].value == turn)
+            {
+                score -= 25;
+            }
+            else if (board[tile].value == -turn)
+            {
+                score += 25;
+            }
+        }
+
+        // Pequeño apoyo por diferencia de fichas para desempatar decisiones.
+        score += HeuristicH1(board) * 0.5;
+
+        return score;
     }
 
     // N: Implementa Minimax con poda alfa-beta
@@ -128,11 +176,37 @@ public class Player : MonoBehaviour
     {
         List<int> moves = boardManager.FindSelectableTiles(node.board, currentTurn);
 
-        // profundidad máxima o sin movimientos posibles.
-        if (depth == 0 || moves.Count == 0)
+        // Caso base: si llegamos a la profundidad máxima, evaluamos el tablero.
+        if (depth == 0)
         {
             node.utility = CalculateUtility(node.board);
             return node.utility;
+        }
+
+        // Si el jugador actual no puede mover, comprobamos si el rival puede mover.
+        if (moves.Count == 0)
+        {
+            List<int> opponentMoves = boardManager.FindSelectableTiles(node.board, -currentTurn);
+
+            if (opponentMoves.Count == 0)
+            {
+                // Si ninguno de los dos puede mover, la partida ha terminado.
+                node.utility = CalculateUtility(node.board);
+                return node.utility;
+            }
+            else
+            {
+                // Si solo este jugador no puede mover, se representa el pase creando
+                // un hijo con el mismo tablero y cambiando el turno.
+                Node passChild = new Node(node.board);
+                passChild.parent = node;
+                passChild.type = isMax ? Constants.MIN : Constants.MAX;
+                node.childList.Add(passChild);
+
+                double utility = Minimax(passChild, depth - 1, -currentTurn, !isMax, alpha, beta);
+                node.utility = utility;
+                return utility;
+            }
         }
 
         if (isMax)
