@@ -71,7 +71,7 @@ public class Player : MonoBehaviour
             boardManager.Move(child.board, s, turn);
 
             // Después del movimiento de la IA, simulamos la respuesta del rival.
-            double utility = Minimax(child, maxDepth - 1, -turn, false);
+            double utility = Minimax(child, maxDepth - 1, -turn, false, double.NegativeInfinity, double.PositiveInfinity);
 
             if (utility > bestUtility)
             {
@@ -120,15 +120,15 @@ public class Player : MonoBehaviour
         return pieceScore + (mobilityScore * 2) + cornerScore;
     }
 
-    // N: Implementa Minimax de forma recursiva. 
-    // depth indica cuántos niveles quedan por explorar
-    // currentTurn indica que jugador mueve en este nivel.
-    // isMax indica si el nodo intenta maximizar o minimizar la utilidad.
-    private double Minimax(Node node, int depth, int currentTurn, bool isMax)
+    // N: Implementa Minimax con poda alfa-beta
+    // alpha guarda la mejor opción hasta ahora para MAX.
+    // beta guarda la mejor opción hasta ahora para MIN.
+    // Si beta <= alpha, se corta la exploración
+    private double Minimax(Node node, int depth, int currentTurn, bool isMax, double alpha, double beta)
     {
         List<int> moves = boardManager.FindSelectableTiles(node.board, currentTurn);
 
-        // Cuando llegamos a profundidad máxima o no hay movimientos posibles
+        // profundidad máxima o sin movimientos posibles.
         if (depth == 0 || moves.Count == 0)
         {
             node.utility = CalculateUtility(node.board);
@@ -148,15 +148,25 @@ public class Player : MonoBehaviour
 
                 boardManager.Move(child.board, move, currentTurn);
 
-                double utility = Minimax(child, depth - 1, -currentTurn, false);
+                double utility = Minimax(child, depth - 1, -currentTurn, false, alpha, beta);
 
                 if (utility > bestUtility)
                 {
                     bestUtility = utility;
                 }
+
+                alpha = Mathf.Max((float)alpha, (float)bestUtility);
+
+                if (beta <= alpha)
+                {
+                    break;
+                }
             }
 
             node.utility = bestUtility;
+            node.alfa = alpha;
+            node.beta = beta;
+
             return bestUtility;
         }
         else
@@ -172,15 +182,25 @@ public class Player : MonoBehaviour
 
                 boardManager.Move(child.board, move, currentTurn);
 
-                double utility = Minimax(child, depth - 1, -currentTurn, true);
+                double utility = Minimax(child, depth - 1, -currentTurn, true, alpha, beta);
 
                 if (utility < bestUtility)
                 {
                     bestUtility = utility;
                 }
+
+                beta = Mathf.Min((float)beta, (float)bestUtility);
+
+                if (beta <= alpha)
+                {
+                    break;
+                }
             }
 
             node.utility = bestUtility;
+            node.alfa = alpha;
+            node.beta = beta;
+
             return bestUtility;
         }
     }
