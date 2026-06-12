@@ -1,0 +1,13 @@
+heuristica,partida,color,semilla,resultado,fichas_ia,fichas_rival
+H1,1,Negras,1000,Victoria,50,14
+H1,2,Negras,1001,Victoria,48,16
+H1,3,Blancas,1002,Victoria,55,9
+H1,4,Blancas,1003,Derrota,21,43
+H2,1,Negras,2000,Victoria,47,17
+H2,2,Negras,2001,Victoria,40,24
+H2,3,Blancas,2002,Derrota,19,45
+H2,4,Blancas,2003,Victoria,53,8
+H3,1,Negras,3000,Victoria,49,15
+H3,2,Negras,3001,Victoria,55,9
+H3,3,Blancas,3002,Victoria,51,13
+H3,4,Blancas,3003,Derrota,23,41
